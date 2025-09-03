@@ -1,0 +1,92 @@
+# core.py
+
+import pandas as pd
+import numpy as np
+
+class ProbabilitySpace():
+   
+    def __init__(self, df, normalise=True):
+        """
+        Initialize the probability space.
+    
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The dataset representing the probability space.
+        normalise_weights : bool, default=True
+            Whether to normalise the weights column to sum to 1. Set to False if 
+            weights are already globally normalised (e.g., when processing a chunk).
+        """
+        if not isinstance(df, pd.DataFrame):
+            raise TypeError("Input must be a pandas DataFrame.")
+    
+        self.df = df.copy()
+        self.variables = {}
+    
+        if 'weights' not in self.df.columns:
+            self.df['weights'] = 1.0 / len(self.df)
+    
+        self.df = self.df.dropna(subset=['weights'])
+    
+        self.n = len(self.df)
+    
+        if normalise and not np.isclose(self.df["weights"].sum(), 1.0):
+            print("weights column does not sum to 1. Normalisation procedure enabled")
+            self.df['weights'] = self.df["weights"] / self.df["weights"].sum()
+    
+
+    def size(self):
+        """
+        Returns the number of rows in the DataFrame.
+        """
+        return self.df.shape[0]
+
+    def columns(self):
+        """
+        Returns the list of column names.
+        """
+        return list(self.df.columns)
+
+    def head(self, n=5):
+        """
+        Returns the first n rows of the DataFrame.
+        """
+        return self.df.head(n)
+
+    def describe(self):
+        """
+        Returns summary statistics.
+        """
+        return self.df.describe()
+
+    def define_random_variable(self, name: str, func):
+        """
+        Defines a new random variable as a transformation of the DataFrame.
+        The result is stored internally under the given name.
+
+        Parameters:
+        - name: The name to assign to the new random variable.
+        - func: A function that takes the DataFrame and returns a pd.Series of values.
+        """
+        try:
+            result = func(self.df)
+            if not isinstance(result, pd.Series):
+                raise ValueError("The function must return a pandas Series.")
+            if len(result) != self.n:
+                raise ValueError("Length of resulting Series must match DataFrame rows.")
+            self.variables[name] = result
+            self.df[name] = result
+        except Exception as e:
+            raise ValueError(f"Failed to define variable '{name}': {str(e)}")
+
+    def get_variable(self, name: str) -> pd.Series:
+        """
+        Returns the Series associated with a defined random variable.
+        If the variable corresponds to a DataFrame column, it returns that column.
+        """
+        if name in self.df.columns:
+            return self.df[name]
+        else:
+            raise KeyError(f"Variable '{name}' not found.")
+        
+   
